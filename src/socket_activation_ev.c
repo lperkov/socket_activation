@@ -37,7 +37,9 @@ static void echo_event_cb(struct bufferevent *bev, short events, void *ctx) {
 		perror("Error from bufferevent");
 	if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR)) {
 		bufferevent_free(bev);
-		active--;
+		if (--active <= 0) {
+			event_base_loopbreak(base);
+		}
 	}
 }
 
@@ -55,12 +57,6 @@ void cb_new_connection(struct evconnlistener *listener, evutil_socket_t fd,
 
 	active++;
 	printf("cb_new_connection\n");
-}
-
-void cb_tim(evutil_socket_t fd, short what, void *ctx) {
-	if (active <= 0) {
-		event_base_loopbreak(base);
-	}
 }
 
 struct evconnlistener *init_socket_activated(void) {
@@ -97,14 +93,8 @@ int main(int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 
-	struct event *tim = event_new(base, 0, EV_TIMEOUT | EV_PERSIST, cb_tim,
-	NULL);
-	struct timeval tv = { 1, 0 };
-	event_add(tim, &tv);
-
 	event_base_dispatch(base);
 
-	event_free(tim);
 	evconnlistener_free(listener);
 	event_base_free(base);
 
